@@ -1,5 +1,5 @@
 
-import { Search, Plus, Download, Moon, Sun, SidebarTrigger } from "lucide-react";
+import { Search, Plus, Download, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { User } from "@/hooks/useAuth";
 import { useState } from "react";
 
