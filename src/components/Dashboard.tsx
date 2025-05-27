@@ -108,6 +108,7 @@ export const Dashboard = () => {
         <AppSidebar 
           selectedTable={selectedTable} 
           onTableSelect={setSelectedTable}
+          onSettingsClick={() => setShowSettings(true)}
           iisCount={iisCount}
           sqlCount={sqlCount}
         />

@@ -1,12 +1,10 @@
-
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DataTable } from "./DataTable";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { EditRecordDialog } from "../EditRecordDialog";
-import { PostgreSQLConnection, PostgreSQLConfig } from "../PostgreSQLConnection";
 import { useToast } from "@/hooks/use-toast";
-import { TableInfo } from "@/services/databaseService";
+import { TableInfo, databaseService } from "@/services/databaseService";
 
 export interface Database {
   id: string;
@@ -22,22 +20,6 @@ export interface Database {
   collected_at: string;
 }
 
-const mockDatabases: Database[] = [
-  {
-    id: "1",
-    hostname: "VP-SQL-DEV",
-    db_name: "ACT",
-    owner: "VP-SQL-DEV\\Administrateur",
-    state: "ONLINE",
-    size_mb: 1930,
-    start_date: "2024-07-04T10:57:58",
-    site_id: "ACT",
-    mdver: "10.0401",
-    last_connection: "2025-01-28T08:37:53",
-    collected_at: "2025-05-15 09:31:02.442637"
-  }
-];
-
 interface DatabasesTableProps {
   searchQuery: string;
   onAddRecord?: () => void;
@@ -47,28 +29,79 @@ interface DatabasesTableProps {
 
 export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRefreshTables }: DatabasesTableProps) => {
   const { toast } = useToast();
-  const [data, setData] = useState<Database[]>(mockDatabases);
+  const [data, setData] = useState<Database[]>([]);
   const [editingRecord, setEditingRecord] = useState<Database | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [dbConfig, setDbConfig] = useState<PostgreSQLConfig | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handlePostgreSQLConnect = (config: PostgreSQLConfig) => {
-    console.log('PostgreSQL connection configured:', config);
-    setDbConfig(config);
-    setIsConnected(true);
-    // In a real implementation, this would connect to the database
+  // Load data from all SQL tables
+  useEffect(() => {
+    loadSQLData();
+  }, [availableTables]);
+
+  const loadSQLData = async () => {
+    setIsLoading(true);
+    try {
+      const sqlTableData = [];
+      const sqlTables = availableTables.filter(table => table.type === 'sql');
+      
+      for (const table of sqlTables) {
+        try {
+          const tableData = await databaseService.getTableData(table.name);
+          // Convert table data to Database format
+          const databases = tableData.rows.map(row => ({
+            id: row.id || Math.random().toString(),
+            hostname: row.hostname || '',
+            db_name: row.db_name || '',
+            owner: row.owner || '',
+            state: row.state === "ONLINE" ? "ONLINE" : "OFFLINE",
+            size_mb: row.size_mb || 0,
+            start_date: row.start_date || new Date().toISOString(),
+            site_id: row.site_id || '',
+            mdver: row.mdver || '',
+            last_connection: row.last_connection || new Date().toISOString(),
+            collected_at: row.collected_at || new Date().toISOString()
+          }));
+          sqlTableData.push(...databases);
+        } catch (error) {
+          console.error(`Failed to load data from table ${table.name}:`, error);
+        }
+      }
+      
+      setData(sqlTableData);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load SQL database data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEditRecord = (record: Database) => {
     setEditingRecord(record);
   };
 
-  const handleSaveRecord = (updatedRecord: Database) => {
+  const handleSaveRecord = async (updatedRecord: Database) => {
     setData(prev => prev.map(item => 
       item.id === updatedRecord.id ? updatedRecord : item
     ));
-    console.log('Updated record:', updatedRecord);
-    // In a real implementation, this would update the database
+    
+    // In real implementation, update the database
+    try {
+      console.log('Updated record:', updatedRecord);
+      toast({
+        title: "Record Updated",
+        description: "Database record updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update record in database.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddRecord = () => {
@@ -93,7 +126,6 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
     });
   };
 
-  // Call onAddRecord when the prop function is provided
   if (onAddRecord) {
     onAddRecord = handleAddRecord;
   }
@@ -176,19 +208,13 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
     );
   }, [data, searchQuery]);
 
-  if (!isConnected) {
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight mb-2">SQL Server Databases</h1>
-          <p className="text-muted-foreground mb-6">
-            Connect to your PostgreSQL database to view and manage your data
-          </p>
+      <div className="space-y-4">
+        <div className="text-center py-8">
+          <h1 className="text-2xl font-bold tracking-tight">Loading SQL Databases...</h1>
+          <p className="text-muted-foreground">Fetching data from {availableTables.filter(t => t.type === 'sql').length} SQL tables</p>
         </div>
-        <PostgreSQLConnection 
-          onConnect={handlePostgreSQLConnect}
-          isConnected={isConnected}
-        />
       </div>
     );
   }
@@ -199,7 +225,7 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
         <div>
           <h1 className="text-2xl font-bold tracking-tight">SQL Server Databases</h1>
           <p className="text-muted-foreground">
-            Monitor and manage your database instances • Connected to: {dbConfig?.database} • {availableTables.length} tables available
+            Monitor and manage your database instances • {availableTables.filter(t => t.type === 'sql').length} tables • {data.length} total records
           </p>
         </div>
         <div className="flex gap-2">

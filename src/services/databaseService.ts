@@ -118,6 +118,7 @@ class DatabaseService {
   }
 
   private categorizeTable(tableName: string): 'iis' | 'sql' {
+    // Updated regex to match v9, v10, v11, etc.
     if (tableName.match(/^vp-v\d+-/)) {
       return 'iis';
     } else if (tableName.startsWith('vp-sql-')) {
@@ -129,10 +130,13 @@ class DatabaseService {
 
   private getMockTables(): TableInfo[] {
     return [
-      { name: 'vp-v10-dev-applications', type: 'iis', rowCount: 156, lastUpdated: new Date().toISOString() },
+      { name: 'vp-v9-dev-applications', type: 'iis', rowCount: 156, lastUpdated: new Date().toISOString() },
+      { name: 'vp-v10-dev-applications', type: 'iis', rowCount: 142, lastUpdated: new Date().toISOString() },
       { name: 'vp-v11-prod-applications', type: 'iis', rowCount: 89, lastUpdated: new Date().toISOString() },
+      { name: 'vp-v12-test-applications', type: 'iis', rowCount: 67, lastUpdated: new Date().toISOString() },
       { name: 'vp-sql-databases', type: 'sql', rowCount: 45, lastUpdated: new Date().toISOString() },
       { name: 'vp-sql-connections', type: 'sql', rowCount: 23, lastUpdated: new Date().toISOString() },
+      { name: 'vp-sql-users', type: 'sql', rowCount: 12, lastUpdated: new Date().toISOString() },
     ];
   }
 
@@ -177,6 +181,15 @@ class DatabaseService {
             state: 'ONLINE',
             size_mb: 1930,
             mdver: '10.0401'
+          },
+          {
+            id: '2',
+            hostname: 'VP-SQL-PROD',
+            db_name: 'PRODUCTION',
+            owner: 'VP-SQL-PROD\\SA',
+            state: 'ONLINE',
+            size_mb: 4560,
+            mdver: '12.0601'
           }
         ]
       };

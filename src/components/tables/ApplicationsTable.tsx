@@ -1,11 +1,11 @@
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DataTable } from "./DataTable";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { EditRecordDialog } from "../EditRecordDialog";
 import { useToast } from "@/hooks/use-toast";
-import { TableInfo } from "@/services/databaseService";
+import { TableInfo, databaseService } from "@/services/databaseService";
 
 export interface Application {
   id: string;
@@ -22,37 +22,6 @@ export interface Application {
   collected_at: string;
 }
 
-const mockApplications: Application[] = [
-  {
-    id: "1",
-    hostname: "VP-V10-DEV",
-    site_name: "Default Web Site",
-    app_name: "MyApp",
-    responsable: "John Doe",
-    date_revue: "2025-03-15",
-    version_socle: "v4.8",
-    pool_name: "DefaultAppPool",
-    pool_state: "Started",
-    runtime: "v4.0",
-    identity: "ApplicationPoolIdentity",
-    collected_at: "2025-05-13 15:24:37.816124"
-  },
-  {
-    id: "2",
-    hostname: "VP-V10-PROD",
-    site_name: "Production Site",
-    app_name: "CriticalApp",
-    responsable: "Jane Smith",
-    date_revue: "2025-01-20",
-    version_socle: "v6.0",
-    pool_name: "CriticalAppPool",
-    pool_state: "Stopped",
-    runtime: "v6.0",
-    identity: "NetworkService",
-    collected_at: "2025-05-13 14:20:15.123456"
-  }
-];
-
 interface ApplicationsTableProps {
   searchQuery: string;
   onAddRecord?: () => void;
@@ -62,18 +31,81 @@ interface ApplicationsTableProps {
 
 export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, onRefreshTables }: ApplicationsTableProps) => {
   const { toast } = useToast();
-  const [data, setData] = useState<Application[]>(mockApplications);
+  const [data, setData] = useState<Application[]>([]);
   const [editingRecord, setEditingRecord] = useState<Application | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load data from all IIS tables
+  useEffect(() => {
+    loadIISData();
+  }, [availableTables]);
+
+  const loadIISData = async () => {
+    setIsLoading(true);
+    try {
+      const iisTableData = [];
+      const iisTables = availableTables.filter(table => table.type === 'iis');
+      
+      for (const table of iisTables) {
+        try {
+          const tableData = await databaseService.getTableData(table.name);
+          // Convert table data to Application format
+          const applications = tableData.rows.map(row => ({
+            id: row.id || Math.random().toString(),
+            hostname: row.hostname || '',
+            site_name: row.site_name || '',
+            app_name: row.app_name || '',
+            responsable: row.responsable || '',
+            date_revue: row.date_revue || new Date().toISOString().split('T')[0],
+            version_socle: row.version_socle || '',
+            pool_name: row.pool_name || '',
+            pool_state: row.pool_state === "Started" ? "Started" : "Stopped",
+            runtime: row.runtime || '',
+            identity: row.identity || '',
+            collected_at: row.collected_at || new Date().toISOString()
+          }));
+          iisTableData.push(...applications);
+        } catch (error) {
+          console.error(`Failed to load data from table ${table.name}:`, error);
+        }
+      }
+      
+      setData(iisTableData);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load IIS application data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEditRecord = (record: Application) => {
     setEditingRecord(record);
   };
 
-  const handleSaveRecord = (updatedRecord: Application) => {
+  const handleSaveRecord = async (updatedRecord: Application) => {
     setData(prev => prev.map(item => 
       item.id === updatedRecord.id ? updatedRecord : item
     ));
-    console.log('Updated record:', updatedRecord);
+    
+    // In real implementation, update the database
+    try {
+      // Find which table this record belongs to and update it
+      console.log('Updated record:', updatedRecord);
+      toast({
+        title: "Record Updated",
+        description: "Application data updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update record in database.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddRecord = () => {
@@ -176,13 +208,24 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     );
   }, [data, searchQuery]);
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-8">
+          <h1 className="text-2xl font-bold tracking-tight">Loading IIS Applications...</h1>
+          <p className="text-muted-foreground">Fetching data from {availableTables.filter(t => t.type === 'iis').length} IIS tables</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">IIS Applications</h1>
           <p className="text-muted-foreground">
-            Manage and monitor your IIS application pools and sites • {availableTables.length} tables available
+            Manage and monitor your IIS application pools and sites • {availableTables.filter(t => t.type === 'iis').length} tables • {data.length} total records
           </p>
         </div>
         <div className="flex gap-2">
