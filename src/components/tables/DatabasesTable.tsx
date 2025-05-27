@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { EditRecordDialog } from "../EditRecordDialog";
 import { PostgreSQLConnection, PostgreSQLConfig } from "../PostgreSQLConnection";
 import { useToast } from "@/hooks/use-toast";
+import { TableInfo } from "@/services/databaseService";
 
 export interface Database {
   id: string;
@@ -40,9 +41,11 @@ const mockDatabases: Database[] = [
 interface DatabasesTableProps {
   searchQuery: string;
   onAddRecord?: () => void;
+  availableTables: TableInfo[];
+  onRefreshTables: () => void;
 }
 
-export const DatabasesTable = ({ searchQuery, onAddRecord }: DatabasesTableProps) => {
+export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRefreshTables }: DatabasesTableProps) => {
   const { toast } = useToast();
   const [data, setData] = useState<Database[]>(mockDatabases);
   const [editingRecord, setEditingRecord] = useState<Database | null>(null);
@@ -196,7 +199,7 @@ export const DatabasesTable = ({ searchQuery, onAddRecord }: DatabasesTableProps
         <div>
           <h1 className="text-2xl font-bold tracking-tight">SQL Server Databases</h1>
           <p className="text-muted-foreground">
-            Monitor and manage your database instances • Connected to: {dbConfig?.database}
+            Monitor and manage your database instances • Connected to: {dbConfig?.database} • {availableTables.length} tables available
           </p>
         </div>
         <div className="flex gap-2">

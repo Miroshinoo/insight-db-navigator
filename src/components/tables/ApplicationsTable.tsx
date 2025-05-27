@@ -1,9 +1,11 @@
+
 import { useState, useMemo } from "react";
 import { DataTable } from "./DataTable";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { EditRecordDialog } from "../EditRecordDialog";
 import { useToast } from "@/hooks/use-toast";
+import { TableInfo } from "@/services/databaseService";
 
 export interface Application {
   id: string;
@@ -54,9 +56,11 @@ const mockApplications: Application[] = [
 interface ApplicationsTableProps {
   searchQuery: string;
   onAddRecord?: () => void;
+  availableTables: TableInfo[];
+  onRefreshTables: () => void;
 }
 
-export const ApplicationsTable = ({ searchQuery, onAddRecord }: ApplicationsTableProps) => {
+export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, onRefreshTables }: ApplicationsTableProps) => {
   const { toast } = useToast();
   const [data, setData] = useState<Application[]>(mockApplications);
   const [editingRecord, setEditingRecord] = useState<Application | null>(null);
@@ -178,7 +182,7 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord }: ApplicationsTabl
         <div>
           <h1 className="text-2xl font-bold tracking-tight">IIS Applications</h1>
           <p className="text-muted-foreground">
-            Manage and monitor your IIS application pools and sites
+            Manage and monitor your IIS application pools and sites • {availableTables.length} tables available
           </p>
         </div>
         <div className="flex gap-2">
