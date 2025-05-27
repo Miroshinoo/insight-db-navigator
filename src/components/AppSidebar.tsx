@@ -19,9 +19,11 @@ import { Button } from "@/components/ui/button";
 interface AppSidebarProps {
   selectedTable: TableType;
   onTableSelect: (table: TableType) => void;
+  iisCount?: number;
+  sqlCount?: number;
 }
 
-export const AppSidebar = ({ selectedTable, onTableSelect }: AppSidebarProps) => {
+export const AppSidebar = ({ selectedTable, onTableSelect, iisCount = 0, sqlCount = 0 }: AppSidebarProps) => {
   const { user, logout } = useAuth();
 
   const menuItems = [
@@ -29,13 +31,13 @@ export const AppSidebar = ({ selectedTable, onTableSelect }: AppSidebarProps) =>
       title: "IIS Applications",
       key: "applications" as TableType,
       icon: Globe,
-      count: 156,
+      count: iisCount,
     },
     {
       title: "SQL Databases",
       key: "databases" as TableType,
       icon: Database,
-      count: 89,
+      count: sqlCount,
     },
   ];
 
