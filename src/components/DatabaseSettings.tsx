@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Database, TestTube, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { databaseService } from "@/services/databaseService";
 
 export interface PostgreSQLConfig {
   host: string;
@@ -35,7 +35,7 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'failed' | null>(null);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!config.database || !config.username) {
       toast({
         title: "Missing Information",
@@ -46,11 +46,31 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
     }
     
     console.log('PostgreSQL Connection Config:', config);
-    onConnect(config);
-    toast({
-      title: "Connection Saved",
-      description: "Database configuration has been saved successfully.",
-    });
+    
+    try {
+      databaseService.setConfig(config);
+      const connected = await databaseService.connect();
+      
+      if (connected) {
+        onConnect(config);
+        toast({
+          title: "Connection Successful",
+          description: "Successfully connected to PostgreSQL database.",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect to the database. Please check your credentials.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Error",
+        description: "An error occurred while connecting to the database.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleTestConnection = async () => {
@@ -67,29 +87,28 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
     setTestResult(null);
 
     try {
-      // Simulate connection test - in real implementation, this would call your backend API
       console.log('Testing PostgreSQL connection with config:', config);
       
-      // Mock API call to test connection
-      const response = await fetch('/api/test-db-connection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-      });
+      const success = await databaseService.testConnection(config);
 
-      if (response.ok) {
+      if (success) {
         setTestResult('success');
         toast({
-          title: "Connection Successful",
+          title: "Connection Test Successful",
           description: "Successfully connected to the PostgreSQL database.",
         });
       } else {
-        throw new Error('Connection failed');
+        setTestResult('failed');
+        toast({
+          title: "Connection Test Failed",
+          description: "Unable to connect to the database. Please check your credentials.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       setTestResult('failed');
       toast({
-        title: "Connection Failed",
+        title: "Connection Test Failed",
         description: "Unable to connect to the database. Please check your credentials.",
         variant: "destructive",
       });
@@ -111,6 +130,15 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!isConnected && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> You need to set up a backend API to handle PostgreSQL connections. 
+                The current implementation requires backend endpoints for database operations.
+              </p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="host">Host</Label>
@@ -190,7 +218,7 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
           </div>
           
           <Button onClick={handleConnect} className="w-full">
-            {isConnected ? 'Update Connection' : 'Save Connection'}
+            {isConnected ? 'Update Connection' : 'Connect to Database'}
           </Button>
           
           {isConnected && (
