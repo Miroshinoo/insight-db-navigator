@@ -127,7 +127,7 @@ class DatabaseService {
   }
 
   private categorizeTable(tableName: string): 'iis' | 'sql' {
-    // Match patterns like vp-v9-, vp-v10-, vp-v11-, etc.
+    // Match patterns like vp-v9-, vp-v10-, vp-v11-, etc. (including double digits)
     if (tableName.match(/^vp-v\d+-.*/)) {
       return 'iis';
     } else if (tableName.startsWith('vp-sql-')) {

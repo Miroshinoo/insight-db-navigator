@@ -1,6 +1,6 @@
 
-// This file defines the API structure for database operations
-// In a real implementation, these would be backend endpoints
+// Real PostgreSQL API implementation
+const API_BASE_URL = 'http://localhost:3001/api';
 
 export interface DatabaseAPI {
   testConnection: (config: any) => Promise<{ success: boolean; error?: string }>;
@@ -10,41 +10,101 @@ export interface DatabaseAPI {
   updateRecord: (config: any, tableName: string, recordId: string, data: any) => Promise<{ success: boolean }>;
 }
 
-// Mock implementation for frontend - replace with actual backend calls
+// Real implementation that connects to the backend API
 export const mockDatabaseAPI: DatabaseAPI = {
   testConnection: async (config) => {
-    // Simulate actual connection test
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Basic validation
-    if (!config.host || !config.database || !config.username) {
-      return { success: false, error: 'Missing required connection parameters' };
+    try {
+      const response = await fetch(`${API_BASE_URL}/test-connection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API connection error:', error);
+      return { 
+        success: false, 
+        error: 'Failed to connect to API server. Make sure the backend server is running on http://localhost:3001' 
+      };
     }
-    
-    // In real implementation, this would test actual PostgreSQL connection
-    return { success: true };
   },
   
   connect: async (config) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { success: true };
+    try {
+      const response = await fetch(`${API_BASE_URL}/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API connection error:', error);
+      return { 
+        success: false, 
+        error: 'Failed to connect to API server' 
+      };
+    }
   },
   
   getTables: async (config) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // This would query: SELECT tablename FROM pg_tables WHERE schemaname = 'public';
-    throw new Error('Backend not implemented - please set up PostgreSQL backend');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const tables = await response.json();
+      return tables;
+    } catch (error) {
+      console.error('Failed to fetch tables:', error);
+      throw new Error('Failed to fetch tables from database');
+    }
   },
   
   getTableData: async (config, tableName) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // This would query: SELECT * FROM ${tableName};
-    throw new Error('Backend not implemented - please set up PostgreSQL backend');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableName)}/data`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`Failed to fetch data for table ${tableName}:`, error);
+      throw new Error(`Failed to fetch data for table ${tableName}`);
+    }
   },
   
   updateRecord: async (config, tableName, recordId, data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // This would execute UPDATE query
-    throw new Error('Backend not implemented - please set up PostgreSQL backend');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableName)}/records/${encodeURIComponent(recordId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error(`Failed to update record in table ${tableName}:`, error);
+      return { success: false };
+    }
   }
 };
