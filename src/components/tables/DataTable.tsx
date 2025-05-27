@@ -27,21 +27,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowUpDown, Edit } from "lucide-react";
 
 interface DataTableProps {
   data: any[];
   columns: any[];
   onUpdateData: (data: any[]) => void;
+  onEditRecord?: (record: any) => void;
 }
 
-export const DataTable = ({ data, columns, onUpdateData }: DataTableProps) => {
+export const DataTable = ({ data, columns, onUpdateData, onEditRecord }: DataTableProps) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
+  // Add edit button column
+  const enhancedColumns = [
+    ...columns,
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }: any) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onEditRecord?.(row.original)}
+          className="h-8 w-8 p-0"
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
   const table = useReactTable({
     data,
-    columns,
+    columns: enhancedColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -64,7 +84,7 @@ export const DataTable = ({ data, columns, onUpdateData }: DataTableProps) => {
       {/* Column filters */}
       <div className="flex flex-wrap gap-2">
         {table.getAllColumns().map((column) => {
-          if (!column.getCanFilter()) return null;
+          if (!column.getCanFilter() || column.id === 'actions') return null;
           return (
             <div key={column.id} className="flex flex-col space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
@@ -104,7 +124,7 @@ export const DataTable = ({ data, columns, onUpdateData }: DataTableProps) => {
                           header.column.columnDef.header,
                           header.getContext()
                         )}
-                        {header.column.getCanSort() && (
+                        {header.column.getCanSort() && header.id !== 'actions' && (
                           <ArrowUpDown className="w-3 h-3" />
                         )}
                       </div>
@@ -130,7 +150,7 @@ export const DataTable = ({ data, columns, onUpdateData }: DataTableProps) => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={enhancedColumns.length} className="h-24 text-center">
                   No results found.
                 </TableCell>
               </TableRow>

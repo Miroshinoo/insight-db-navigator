@@ -1,8 +1,9 @@
-
 import { useState, useMemo } from "react";
 import { DataTable } from "./DataTable";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import { EditRecordDialog } from "../EditRecordDialog";
+import { useToast } from "@/hooks/use-toast";
 
 export interface Application {
   id: string;
@@ -52,10 +53,51 @@ const mockApplications: Application[] = [
 
 interface ApplicationsTableProps {
   searchQuery: string;
+  onAddRecord?: () => void;
 }
 
-export const ApplicationsTable = ({ searchQuery }: ApplicationsTableProps) => {
+export const ApplicationsTable = ({ searchQuery, onAddRecord }: ApplicationsTableProps) => {
+  const { toast } = useToast();
   const [data, setData] = useState<Application[]>(mockApplications);
+  const [editingRecord, setEditingRecord] = useState<Application | null>(null);
+
+  const handleEditRecord = (record: Application) => {
+    setEditingRecord(record);
+  };
+
+  const handleSaveRecord = (updatedRecord: Application) => {
+    setData(prev => prev.map(item => 
+      item.id === updatedRecord.id ? updatedRecord : item
+    ));
+    console.log('Updated record:', updatedRecord);
+  };
+
+  const handleAddRecord = () => {
+    const newRecord: Application = {
+      id: (data.length + 1).toString(),
+      hostname: "",
+      site_name: "",
+      app_name: "",
+      responsable: "",
+      date_revue: new Date().toISOString().split('T')[0],
+      version_socle: "",
+      pool_name: "",
+      pool_state: "Stopped",
+      runtime: "",
+      identity: "",
+      collected_at: new Date().toISOString()
+    };
+    setData(prev => [...prev, newRecord]);
+    setEditingRecord(newRecord);
+    toast({
+      title: "Record Added",
+      description: "New blank record created. Fill in the details.",
+    });
+  };
+
+  if (onAddRecord) {
+    onAddRecord = handleAddRecord;
+  }
 
   const columns = useMemo(() => [
     {
@@ -155,6 +197,14 @@ export const ApplicationsTable = ({ searchQuery }: ApplicationsTableProps) => {
         data={filteredData}
         columns={columns}
         onUpdateData={setData}
+        onEditRecord={handleEditRecord}
+      />
+
+      <EditRecordDialog
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        record={editingRecord}
+        onSave={handleSaveRecord}
       />
     </div>
   );

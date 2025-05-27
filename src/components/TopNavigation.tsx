@@ -1,5 +1,5 @@
 
-import { Search, Plus, Download, Moon, Sun } from "lucide-react";
+import { Search, Plus, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,14 +13,27 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { User } from "@/hooks/useAuth";
 import { useState } from "react";
+import { ExportMenu } from "./ExportMenu";
 
 interface TopNavigationProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   user: User | null;
+  onAddRecord?: () => void;
+  exportData?: any[];
+  exportFilename?: string;
+  onSettingsClick?: () => void;
 }
 
-export const TopNavigation = ({ searchQuery, onSearchChange, user }: TopNavigationProps) => {
+export const TopNavigation = ({ 
+  searchQuery, 
+  onSearchChange, 
+  user, 
+  onAddRecord,
+  exportData = [],
+  exportFilename,
+  onSettingsClick
+}: TopNavigationProps) => {
   const [isDark, setIsDark] = useState(false);
 
   const toggleTheme = () => {
@@ -44,17 +57,14 @@ export const TopNavigation = ({ searchQuery, onSearchChange, user }: TopNavigati
       </div>
 
       <div className="flex items-center gap-2">
-        {user?.role === "Admin" && (
-          <Button size="sm" className="gap-2">
+        {user?.role === "Admin" && onAddRecord && (
+          <Button size="sm" className="gap-2" onClick={onAddRecord}>
             <Plus className="w-4 h-4" />
             Add Record
           </Button>
         )}
         
-        <Button variant="outline" size="sm" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export
-        </Button>
+        <ExportMenu data={exportData} filename={exportFilename} />
 
         <Button variant="ghost" size="sm" onClick={toggleTheme}>
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -81,6 +91,7 @@ export const TopNavigation = ({ searchQuery, onSearchChange, user }: TopNavigati
             <DropdownMenuItem>Profile Settings</DropdownMenuItem>
             <DropdownMenuItem>Change Password</DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onSettingsClick}>Settings</DropdownMenuItem>
             <DropdownMenuItem>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
