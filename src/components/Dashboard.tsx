@@ -18,7 +18,7 @@ import { UserRole } from "@/types/permissions";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 
 export type TableType = "applications" | "databases";
-export type SettingsTab = "database" | "permissions" | "audit" | "search" | "backup" | "notifications" | "import";
+export type SettingsTab = "database" | "analytics" | "permissions" | "audit" | "search" | "backup" | "notifications" | "import";
 
 export const Dashboard = () => {
   const { user, isAuthenticated } = useAuth();
