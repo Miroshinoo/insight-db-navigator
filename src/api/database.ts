@@ -1,10 +1,22 @@
-
 // Real PostgreSQL API implementation
-const API_BASE_URL = 'http://localhost:3001/api';
+const getApiBaseUrl = () => {
+  // Try to detect the current host and use it for the API
+  const currentHost = window.location.hostname;
+  
+  // If running on localhost, use localhost
+  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    return 'http://localhost:3001/api';
+  }
+  
+  // Otherwise, use the current host with port 3001
+  return `http://${currentHost}:3001/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface DatabaseAPI {
-  testConnection: (config: any) => Promise<{ success: boolean; error?: string }>;
-  connect: (config: any) => Promise<{ success: boolean; error?: string }>;
+  testConnection: (config: any) => Promise<{ success: boolean; error?: string; details?: string }>;
+  connect: (config: any) => Promise<{ success: boolean; error?: string; details?: string }>;
   getTables: (config: any) => Promise<string[]>;
   getTableData: (config: any, tableName: string) => Promise<{ columns: string[]; rows: any[] }>;
   updateRecord: (config: any, tableName: string, recordId: string, data: any) => Promise<{ success: boolean }>;
@@ -14,6 +26,9 @@ export interface DatabaseAPI {
 export const mockDatabaseAPI: DatabaseAPI = {
   testConnection: async (config) => {
     try {
+      console.log(`Attempting to connect to API at: ${API_BASE_URL}/test-connection`);
+      console.log('Connection config:', { ...config, password: '[REDACTED]' });
+      
       const response = await fetch(`${API_BASE_URL}/test-connection`, {
         method: 'POST',
         headers: {
@@ -22,19 +37,42 @@ export const mockDatabaseAPI: DatabaseAPI = {
         body: JSON.stringify(config),
       });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`HTTP error! status: ${response.status}, response: ${errorText}`);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          details: errorText
+        };
+      }
+      
       const result = await response.json();
+      console.log('API response:', result);
       return result;
     } catch (error) {
       console.error('API connection error:', error);
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return { 
+          success: false, 
+          error: 'Impossible de se connecter au serveur API',
+          details: `Vérifiez que le serveur backend est démarré sur ${API_BASE_URL.replace('/api', '')}. Erreur: ${error.message}`
+        };
+      }
+      
       return { 
         success: false, 
-        error: 'Failed to connect to API server. Make sure the backend server is running on http://localhost:3001' 
+        error: 'Erreur de connexion API inattendue',
+        details: error instanceof Error ? error.message : String(error)
       };
     }
   },
   
   connect: async (config) => {
     try {
+      console.log(`Attempting to connect to API at: ${API_BASE_URL}/connect`);
+      
       const response = await fetch(`${API_BASE_URL}/connect`, {
         method: 'POST',
         headers: {
@@ -43,13 +81,34 @@ export const mockDatabaseAPI: DatabaseAPI = {
         body: JSON.stringify(config),
       });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`HTTP error! status: ${response.status}, response: ${errorText}`);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          details: errorText
+        };
+      }
+      
       const result = await response.json();
+      console.log('Connect API response:', result);
       return result;
     } catch (error) {
       console.error('API connection error:', error);
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return { 
+          success: false, 
+          error: 'Impossible de se connecter au serveur API',
+          details: `Vérifiez que le serveur backend est démarré sur ${API_BASE_URL.replace('/api', '')}. Erreur: ${error.message}`
+        };
+      }
+      
       return { 
         success: false, 
-        error: 'Failed to connect to API server' 
+        error: 'Erreur de connexion API inattendue',
+        details: error instanceof Error ? error.message : String(error)
       };
     }
   },

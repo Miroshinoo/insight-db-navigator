@@ -1,4 +1,3 @@
-
 import { PostgreSQLConfig } from "@/components/DatabaseSettings";
 import { mockDatabaseAPI } from "@/api/database";
 
@@ -28,41 +27,56 @@ class DatabaseService {
     return this.isConnected && this.config !== null;
   }
 
-  async testConnection(config: PostgreSQLConfig): Promise<boolean> {
+  async testConnection(config: PostgreSQLConfig): Promise<{ success: boolean; error?: string; details?: string }> {
     try {
       const result = await mockDatabaseAPI.testConnection(config);
-      return result.success;
+      return result;
     } catch (error) {
       console.error('Connection test failed:', error);
-      return false;
+      return {
+        success: false,
+        error: 'Erreur lors du test de connexion',
+        details: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 
   async connect(): Promise<boolean> {
     if (!this.config) {
-      throw new Error('Database not configured');
+      throw new Error('Base de données non configurée');
     }
 
     try {
       const result = await mockDatabaseAPI.connect(this.config);
       this.isConnected = result.success;
+      
+      if (!result.success && result.error) {
+        console.error('Connection failed:', result.error, result.details);
+        throw new Error(result.details || result.error);
+      }
+      
       return result.success;
     } catch (error) {
       console.error('Failed to connect to database:', error);
       this.isConnected = false;
-      return false;
+      
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('Échec de la connexion à la base de données');
     }
   }
 
   async getTables(): Promise<TableInfo[]> {
     if (!this.config) {
-      throw new Error('Database not configured');
+      throw new Error('Base de données non configurée');
     }
 
     if (!this.isConnected) {
       const connected = await this.connect();
       if (!connected) {
-        throw new Error('Failed to connect to database');
+        throw new Error('Échec de la connexion à la base de données');
       }
     }
 
@@ -83,13 +97,13 @@ class DatabaseService {
 
   async getTableData(tableName: string): Promise<TableData> {
     if (!this.config) {
-      throw new Error('Database not configured');
+      throw new Error('Base de données non configurée');
     }
 
     if (!this.isConnected) {
       const connected = await this.connect();
       if (!connected) {
-        throw new Error('Failed to connect to database');
+        throw new Error('Échec de la connexion à la base de données');
       }
     }
 
@@ -107,13 +121,13 @@ class DatabaseService {
 
   async updateRecord(tableName: string, recordId: string, data: Record<string, any>): Promise<boolean> {
     if (!this.config) {
-      throw new Error('Database not configured');
+      throw new Error('Base de données non configurée');
     }
 
     if (!this.isConnected) {
       const connected = await this.connect();
       if (!connected) {
-        throw new Error('Failed to connect to database');
+        throw new Error('Échec de la connexion à la base de données');
       }
     }
 

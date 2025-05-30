@@ -1,9 +1,11 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Database, TestTube, CheckCircle, XCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Database, TestTube, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { databaseService } from "@/services/databaseService";
 
@@ -34,12 +36,21 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
   });
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'failed' | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string>('');
+
+  const getApiUrl = () => {
+    const currentHost = window.location.hostname;
+    if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+    return `http://${currentHost}:3001`;
+  };
 
   const handleConnect = async () => {
     if (!config.database || !config.username) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in database name and username",
+        title: "Informations manquantes",
+        description: "Veuillez remplir le nom de la base de données et le nom d'utilisateur",
         variant: "destructive",
       });
       return;
@@ -49,25 +60,31 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
     
     try {
       databaseService.setConfig(config);
-      const connected = await databaseService.connect();
+      const result = await databaseService.connect();
       
-      if (connected) {
+      if (result) {
         onConnect(config);
+        setTestResult('success');
+        setErrorDetails('');
         toast({
-          title: "Connection Successful",
-          description: "Successfully connected to PostgreSQL database.",
+          title: "Connexion réussie",
+          description: "Connexion à la base de données PostgreSQL établie avec succès.",
         });
       } else {
+        setTestResult('failed');
         toast({
-          title: "Connection Failed",
-          description: "Failed to connect to the database. Please check your credentials.",
+          title: "Échec de la connexion",
+          description: "Impossible de se connecter à la base de données. Vérifiez vos identifiants.",
           variant: "destructive",
         });
       }
     } catch (error) {
+      setTestResult('failed');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setErrorDetails(errorMessage);
       toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to the database.",
+        title: "Erreur de connexion",
+        description: "Une erreur s'est produite lors de la connexion à la base de données.",
         variant: "destructive",
       });
     }
@@ -76,8 +93,8 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
   const handleTestConnection = async () => {
     if (!config.database || !config.username) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in database name and username",
+        title: "Informations manquantes",
+        description: "Veuillez remplir le nom de la base de données et le nom d'utilisateur",
         variant: "destructive",
       });
       return;
@@ -85,31 +102,36 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
 
     setIsTestingConnection(true);
     setTestResult(null);
+    setErrorDetails('');
 
     try {
       console.log('Testing PostgreSQL connection with config:', config);
       
-      const success = await databaseService.testConnection(config);
+      const result = await databaseService.testConnection(config);
 
-      if (success) {
+      if (result.success) {
         setTestResult('success');
+        setErrorDetails('');
         toast({
-          title: "Connection Test Successful",
-          description: "Successfully connected to the PostgreSQL database.",
+          title: "Test de connexion réussi",
+          description: "Connexion à la base de données PostgreSQL établie avec succès.",
         });
       } else {
         setTestResult('failed');
+        setErrorDetails(result.details || result.error || 'Erreur inconnue');
         toast({
-          title: "Connection Test Failed",
-          description: "Unable to connect to the database. Please check your credentials.",
+          title: "Échec du test de connexion",
+          description: result.error || "Impossible de se connecter à la base de données.",
           variant: "destructive",
         });
       }
     } catch (error) {
       setTestResult('failed');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setErrorDetails(errorMessage);
       toast({
-        title: "Connection Test Failed",
-        description: "Unable to connect to the database. Please check your credentials.",
+        title: "Échec du test de connexion",
+        description: "Impossible de se connecter à la base de données. Vérifiez vos identifiants.",
         variant: "destructive",
       });
     } finally {
@@ -123,25 +145,26 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
         <CardHeader>
           <div className="flex items-center gap-2">
             <Database className="w-5 h-5" />
-            <CardTitle>PostgreSQL Database Connection</CardTitle>
+            <CardTitle>Connexion à la base de données PostgreSQL</CardTitle>
           </div>
           <CardDescription>
-            Configure your PostgreSQL database connection to read IIS applications and SQL database tables
+            Configurez votre connexion à la base de données PostgreSQL pour lire les applications IIS et les tables de base de données SQL
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!isConnected && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> You need to set up a backend API to handle PostgreSQL connections. 
-                The current implementation requires backend endpoints for database operations.
-              </p>
-            </div>
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Configuration actuelle :</strong> L'API backend doit être accessible sur <code>{getApiUrl()}</code>. 
+                Assurez-vous que le serveur backend est démarré sur ce port.
+              </AlertDescription>
+            </Alert>
           )}
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="host">Host</Label>
+              <Label htmlFor="host">Hôte</Label>
               <Input
                 id="host"
                 value={config.host}
@@ -161,17 +184,17 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="database">Database Name</Label>
+            <Label htmlFor="database">Nom de la base de données</Label>
             <Input
               id="database"
               value={config.database}
               onChange={(e) => setConfig({...config, database: e.target.value})}
-              placeholder="your_database"
+              placeholder="votre_base_de_donnees"
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">Nom d'utilisateur</Label>
             <Input
               id="username"
               value={config.username}
@@ -181,13 +204,13 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Mot de passe</Label>
             <Input
               id="password"
               type="password"
               value={config.password}
               onChange={(e) => setConfig({...config, password: e.target.value})}
-              placeholder="password"
+              placeholder="mot_de_passe"
             />
           </div>
           
@@ -200,7 +223,7 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
               disabled={isTestingConnection}
             >
               <TestTube className="w-4 h-4" />
-              {isTestingConnection ? 'Testing...' : 'Test Connection'}
+              {isTestingConnection ? 'Test en cours...' : 'Tester la connexion'}
             </Button>
             
             {testResult && (
@@ -212,18 +235,28 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
                 ) : (
                   <XCircle className="w-4 h-4" />
                 )}
-                {testResult === 'success' ? 'Connection successful' : 'Connection failed'}
+                {testResult === 'success' ? 'Connexion réussie' : 'Échec de la connexion'}
               </div>
             )}
           </div>
+
+          {errorDetails && testResult === 'failed' && (
+            <Alert variant="destructive">
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Détails de l'erreur :</strong><br />
+                {errorDetails}
+              </AlertDescription>
+            </Alert>
+          )}
           
           <Button onClick={handleConnect} className="w-full">
-            {isConnected ? 'Update Connection' : 'Connect to Database'}
+            {isConnected ? 'Mettre à jour la connexion' : 'Se connecter à la base de données'}
           </Button>
           
           {isConnected && (
             <div className="text-sm text-green-600 text-center">
-              ✓ Database connection configured
+              ✓ Connexion à la base de données configurée
             </div>
           )}
         </CardContent>
@@ -231,20 +264,20 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
 
       <Card>
         <CardHeader>
-          <CardTitle>Table Categories</CardTitle>
+          <CardTitle>Catégories de tables</CardTitle>
           <CardDescription>
-            Tables will be automatically categorized based on their naming patterns
+            Les tables seront automatiquement catégorisées en fonction de leurs modèles de nommage
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm"><strong>IIS Applications:</strong> Tables matching pattern vp-v[number]-*</span>
+              <span className="text-sm"><strong>Applications IIS :</strong> Tables correspondant au modèle vp-v[numéro]-*</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm"><strong>SQL Databases:</strong> Tables matching pattern vp-sql-*</span>
+              <span className="text-sm"><strong>Bases de données SQL :</strong> Tables correspondant au modèle vp-sql-*</span>
             </div>
           </div>
         </CardContent>
@@ -252,3 +285,4 @@ export const DatabaseSettings = ({ onConnect, isConnected, currentConfig }: Data
     </div>
   );
 };
+
