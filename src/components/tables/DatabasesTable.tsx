@@ -31,6 +31,7 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
   const { toast } = useToast();
   const [data, setData] = useState<Database[]>([]);
   const [editingRecord, setEditingRecord] = useState<Database | null>(null);
+  const [editingTableName, setEditingTableName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   // Load data from all SQL tables
@@ -59,7 +60,8 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
             site_id: row.site_id || '',
             mdver: row.mdver || '',
             last_connection: row.last_connection || new Date().toISOString(),
-            collected_at: row.collected_at || new Date().toISOString()
+            collected_at: row.collected_at || new Date().toISOString(),
+            _tableName: table.name // Track which table this record comes from
           }));
           sqlTableData.push(...databases);
         } catch (error) {
@@ -81,6 +83,9 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
 
   const handleEditRecord = (record: Database) => {
     setEditingRecord(record);
+    // Find which table this record belongs to
+    const recordWithTable = data.find(r => r.id === record.id);
+    setEditingTableName((recordWithTable as any)?._tableName || 'unknown');
   };
 
   const handleSaveRecord = async (updatedRecord: Database) => {
@@ -88,20 +93,13 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
       item.id === updatedRecord.id ? updatedRecord : item
     ));
     
-    // In real implementation, update the database
-    try {
-      console.log('Updated record:', updatedRecord);
-      toast({
-        title: "Record Updated",
-        description: "Database record updated successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update record in database.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Record Updated",
+      description: "Database record updated successfully in database.",
+    });
+    
+    // Refresh data to ensure consistency
+    await loadSQLData();
   };
 
   const handleAddRecord = () => {
@@ -251,6 +249,7 @@ export const DatabasesTable = ({ searchQuery, onAddRecord, availableTables, onRe
         isOpen={!!editingRecord}
         onClose={() => setEditingRecord(null)}
         record={editingRecord}
+        tableName={editingTableName}
         onSave={handleSaveRecord}
       />
     </div>

@@ -148,17 +148,57 @@ app.put('/api/tables/:tableName/records/:recordId', async (req, res) => {
   
   try {
     // Build UPDATE query dynamically
-    const fields = Object.keys(updateData).filter(key => key !== 'id');
+    const fields = Object.keys(updateData).filter(key => key !== 'id' && key !== '_tableName');
     const setClause = fields.map((field, index) => `"${field}" = $${index + 2}`).join(', ');
     const values = [recordId, ...fields.map(field => updateData[field])];
     
     const query = `UPDATE "${tableName}" SET ${setClause} WHERE id = $1`;
     
-    await pool.query(query, values);
+    const result = await pool.query(query, values);
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'Record not found' });
+    }
+    
     res.json({ success: true });
   } catch (error) {
     console.error(`Failed to update record in table ${tableName}:`, error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create users table if it doesn't exist
+app.post('/api/create-users-table', async (req, res) => {
+  if (!pool) {
+    return res.status(400).json({ error: 'No database connection' });
+  }
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        role VARCHAR(50) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP,
+        is_active BOOLEAN DEFAULT true
+      )
+    `);
+    
+    // Insert default admin user if table is empty
+    const userCount = await pool.query('SELECT COUNT(*) FROM users');
+    if (parseInt(userCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO users (username, email, role) 
+        VALUES ('admin', 'admin@example.com', 'admin')
+      `);
+    }
+    
+    res.json({ success: true, message: 'Users table created successfully' });
+  } catch (error) {
+    console.error('Failed to create users table:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

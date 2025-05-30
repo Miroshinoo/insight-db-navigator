@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from "react";
 import { DataTable } from "./DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +32,7 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
   const { toast } = useToast();
   const [data, setData] = useState<Application[]>([]);
   const [editingRecord, setEditingRecord] = useState<Application | null>(null);
+  const [editingTableName, setEditingTableName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   // Load data from all IIS tables
@@ -55,14 +55,15 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
             hostname: row.hostname || '',
             site_name: row.site_name || '',
             app_name: row.app_name || '',
-            responsable: row.responsable || '',
-            date_revue: row.date_revue || new Date().toISOString().split('T')[0],
+            responsable: row.responsable || '', // Default empty, to be filled manually
+            date_revue: row.date_revue || '', // Default empty, to be filled manually
             version_socle: row.version_socle || '',
             pool_name: row.pool_name || '',
             pool_state: row.pool_state === "Started" ? "Started" : "Stopped",
             runtime: row.runtime || '',
             identity: row.identity || '',
-            collected_at: row.collected_at || new Date().toISOString()
+            collected_at: row.collected_at || new Date().toISOString(),
+            _tableName: table.name // Track which table this record comes from
           }));
           iisTableData.push(...applications);
         } catch (error) {
@@ -84,6 +85,9 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
 
   const handleEditRecord = (record: Application) => {
     setEditingRecord(record);
+    // Find which table this record belongs to
+    const recordWithTable = data.find(r => r.id === record.id);
+    setEditingTableName((recordWithTable as any)?._tableName || 'unknown');
   };
 
   const handleSaveRecord = async (updatedRecord: Application) => {
@@ -91,21 +95,13 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
       item.id === updatedRecord.id ? updatedRecord : item
     ));
     
-    // In real implementation, update the database
-    try {
-      // Find which table this record belongs to and update it
-      console.log('Updated record:', updatedRecord);
-      toast({
-        title: "Record Updated",
-        description: "Application data updated successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update record in database.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Record Updated",
+      description: "Application data updated successfully in database.",
+    });
+    
+    // Refresh data to ensure consistency
+    await loadIISData();
   };
 
   const handleAddRecord = () => {
@@ -158,7 +154,18 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
       accessorKey: "responsable",
       header: "Responsible",
       cell: ({ row }: any) => (
-        <span className="text-blue-600">{row.original.responsable}</span>
+        <span className={`${row.original.responsable ? 'text-blue-600' : 'text-muted-foreground italic'}`}>
+          {row.original.responsable || 'Not assigned'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "date_revue",
+      header: "Review Date",
+      cell: ({ row }: any) => (
+        <span className={`text-sm ${row.original.date_revue ? '' : 'text-muted-foreground italic'}`}>
+          {row.original.date_revue || 'Not scheduled'}
+        </span>
       ),
     },
     {
@@ -251,6 +258,7 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
         isOpen={!!editingRecord}
         onClose={() => setEditingRecord(null)}
         record={editingRecord}
+        tableName={editingTableName}
         onSave={handleSaveRecord}
       />
     </div>
