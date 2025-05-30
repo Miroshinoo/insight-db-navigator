@@ -1,5 +1,5 @@
 
-import { Search, Plus, Moon, Sun } from "lucide-react";
+import { Search, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,7 +19,6 @@ interface TopNavigationProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   user: User | null;
-  onAddRecord?: () => void;
   exportData?: any[];
   exportFilename?: string;
   onSettingsClick?: () => void;
@@ -29,7 +28,6 @@ export const TopNavigation = ({
   searchQuery, 
   onSearchChange, 
   user, 
-  onAddRecord,
   exportData = [],
   exportFilename,
   onSettingsClick
@@ -57,13 +55,6 @@ export const TopNavigation = ({
       </div>
 
       <div className="flex items-center gap-2">
-        {user?.role === "Admin" && onAddRecord && (
-          <Button size="sm" className="gap-2" onClick={onAddRecord}>
-            <Plus className="w-4 h-4" />
-            Add Record
-          </Button>
-        )}
-        
         <ExportMenu data={exportData} filename={exportFilename} />
 
         <Button variant="ghost" size="sm" onClick={toggleTheme}>

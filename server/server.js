@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
@@ -136,6 +137,28 @@ app.get('/api/tables/:tableName/data', async (req, res) => {
   }
 });
 
+// Helper function to sanitize and format values
+function sanitizeValue(value, columnName) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  
+  // Handle date fields specially
+  if (columnName && (columnName.includes('date') || columnName.includes('_at'))) {
+    if (typeof value === 'string' && value.trim() === '') {
+      return null;
+    }
+    // Try to parse the date, return null if invalid
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toISOString();
+  }
+  
+  return value;
+}
+
 // Create record
 app.post('/api/tables/:tableName/records', async (req, res) => {
   if (!pool) {
@@ -146,15 +169,23 @@ app.post('/api/tables/:tableName/records', async (req, res) => {
   const createData = req.body;
   
   try {
-    // Build INSERT query dynamically
-    const fields = Object.keys(createData);
+    // Remove internal fields
+    const cleanData = { ...createData };
+    delete cleanData._tableName;
+    
+    // Build INSERT query dynamically, excluding id field
+    const fields = Object.keys(cleanData).filter(key => key !== 'id');
+    const sanitizedValues = fields.map(field => sanitizeValue(cleanData[field], field));
+    
     const placeholders = fields.map((_, index) => `$${index + 1}`).join(', ');
     const fieldNames = fields.map(field => `"${field}"`).join(', ');
-    const values = fields.map(field => createData[field]);
     
     const query = `INSERT INTO "${tableName}" (${fieldNames}) VALUES (${placeholders}) RETURNING id`;
     
-    const result = await pool.query(query, values);
+    console.log('Creating record with query:', query);
+    console.log('Values:', sanitizedValues);
+    
+    const result = await pool.query(query, sanitizedValues);
     
     res.json({ success: true, id: result.rows[0]?.id });
   } catch (error) {
@@ -173,12 +204,33 @@ app.put('/api/tables/:tableName/records/:recordId', async (req, res) => {
   const updateData = req.body;
   
   try {
-    // Build UPDATE query dynamically
-    const fields = Object.keys(updateData).filter(key => key !== 'id' && key !== '_tableName');
-    const setClause = fields.map((field, index) => `"${field}" = $${index + 2}`).join(', ');
-    const values = [recordId, ...fields.map(field => updateData[field])];
+    // Remove internal fields and id from update data
+    const cleanData = { ...updateData };
+    delete cleanData.id;
+    delete cleanData._tableName;
+    
+    // Filter out fields that are empty, null, or undefined to avoid partial updates issues
+    const fieldsToUpdate = Object.keys(cleanData).filter(key => {
+      const value = cleanData[key];
+      // Only include fields that have actual values or are explicitly being set to null/empty
+      return value !== undefined;
+    });
+    
+    if (fieldsToUpdate.length === 0) {
+      return res.json({ success: true }); // Nothing to update
+    }
+    
+    // Sanitize values
+    const sanitizedValues = fieldsToUpdate.map(field => sanitizeValue(cleanData[field], field));
+    
+    // Build UPDATE query dynamically with proper parameterization
+    const setClause = fieldsToUpdate.map((field, index) => `"${field}" = $${index + 2}`).join(', ');
+    const values = [recordId, ...sanitizedValues];
     
     const query = `UPDATE "${tableName}" SET ${setClause} WHERE id = $1`;
+    
+    console.log('Updating record with query:', query);
+    console.log('Values:', values);
     
     const result = await pool.query(query, values);
     

@@ -27,20 +27,49 @@ interface EditRecordDialogProps {
 export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }: EditRecordDialogProps) => {
   const { toast } = useToast();
   const [editedRecord, setEditedRecord] = useState(record || {});
+  const [originalRecord, setOriginalRecord] = useState(record || {});
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     if (record) {
-      setEditedRecord({...record});
+      const cleanRecord = {...record};
+      setEditedRecord(cleanRecord);
+      setOriginalRecord(cleanRecord);
       // Store original state in history
-      setHistory([{...record, timestamp: new Date().toISOString(), action: 'ouvert'}]);
+      setHistory([{...cleanRecord, timestamp: new Date().toISOString(), action: 'ouvert'}]);
     }
   }, [record]);
 
   const handleSave = async () => {
     setIsLoading(true);
     try {
+      // Only send changed fields to avoid database errors
+      const changedFields: any = {};
+      let hasChanges = false;
+
+      Object.keys(editedRecord).forEach(key => {
+        if (key !== 'id' && key !== '_tableName') {
+          const originalValue = originalRecord[key];
+          const editedValue = editedRecord[key];
+          
+          // Check if value actually changed
+          if (originalValue !== editedValue) {
+            changedFields[key] = editedValue;
+            hasChanges = true;
+          }
+        }
+      });
+
+      if (!hasChanges) {
+        toast({
+          title: "Aucune modification",
+          description: "Aucun changement détecté.",
+        });
+        onClose();
+        return;
+      }
+
       // Add to history before saving
       setHistory(prev => [...prev, {
         ...editedRecord, 
@@ -48,14 +77,19 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
         action: 'sauvegarde en cours'
       }]);
 
-      const success = await databaseService.updateRecord(tableName, record.id, editedRecord);
+      console.log('Saving only changed fields:', changedFields);
+      const success = await databaseService.updateRecord(tableName, record.id, changedFields);
       
       if (success) {
-        onSave(editedRecord);
+        // Update the record with all current values
+        const updatedRecord = { ...editedRecord };
+        onSave(updatedRecord);
+        
         toast({
           title: "Enregistrement mis à jour",
           description: "Les modifications ont été sauvegardées avec succès dans la base de données.",
         });
+        
         setHistory(prev => [...prev, {
           ...editedRecord, 
           timestamp: new Date().toISOString(), 
@@ -73,10 +107,7 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
         variant: "destructive",
       });
       // Fallback: revert to original state
-      if (history.length > 0) {
-        const original = history[0];
-        setEditedRecord(original);
-      }
+      setEditedRecord({...originalRecord});
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +162,7 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
         <DialogHeader>
           <DialogTitle className="text-xl">Modifier l'enregistrement - Yggdrasil Listing</DialogTitle>
           <DialogDescription className="flex items-center gap-2">
-            Modifiez les champs de l'enregistrement ci-dessous. Toutes les modifications seront sauvegardées dans la base de données.
+            Modifiez les champs de l'enregistrement ci-dessous. Seuls les champs modifiés seront sauvegardés.
             <Badge variant="outline">{tableName}</Badge>
           </DialogDescription>
         </DialogHeader>
@@ -144,18 +175,19 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
                 if (key === 'id' || key === '_tableName') return null;
                 
                 const fieldType = getFieldType(key, value);
+                const hasChanged = originalRecord[key] !== editedRecord[key];
                 
                 return (
                   <div key={key} className="space-y-3">
-                    <Label htmlFor={key} className="text-sm font-semibold text-foreground">
-                      {getFieldLabel(key)}
+                    <Label htmlFor={key} className={`text-sm font-semibold ${hasChanged ? 'text-blue-600' : 'text-foreground'}`}>
+                      {getFieldLabel(key)} {hasChanged && '(modifié)'}
                     </Label>
                     {fieldType === 'textarea' ? (
                       <Textarea
                         id={key}
                         value={editedRecord[key] || ''}
                         onChange={(e) => handleFieldChange(key, e.target.value)}
-                        className="min-h-[120px] resize-none"
+                        className={`min-h-[120px] resize-none ${hasChanged ? 'border-blue-500' : ''}`}
                         placeholder={`Entrez ${getFieldLabel(key).toLowerCase()}...`}
                       />
                     ) : key === 'pool_state' ? (
@@ -163,7 +195,7 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
                         id={key}
                         value={editedRecord[key] || ''}
                         onChange={(e) => handleFieldChange(key, e.target.value)}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${hasChanged ? 'border-blue-500' : ''}`}
                       >
                         <option value="Started">Started</option>
                         <option value="Stopped">Stopped</option>
@@ -174,7 +206,7 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
                         type={fieldType}
                         value={editedRecord[key] || ''}
                         onChange={(e) => handleFieldChange(key, e.target.value)}
-                        className="h-10"
+                        className={`h-10 ${hasChanged ? 'border-blue-500' : ''}`}
                         placeholder={`Entrez ${getFieldLabel(key).toLowerCase()}...`}
                       />
                     )}

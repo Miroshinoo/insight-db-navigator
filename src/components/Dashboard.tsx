@@ -106,7 +106,6 @@ export const Dashboard = () => {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             user={user}
-            onAddRecord={handleAddRecord}
             exportData={getExportData()}
             exportFilename={selectedTable}
             onSettingsClick={() => setShowSettings(true)}
