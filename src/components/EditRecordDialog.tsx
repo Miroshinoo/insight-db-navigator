@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { databaseService } from "@/services/databaseService";
+import { Badge } from "@/components/ui/badge";
 
 interface EditRecordDialogProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
     if (record) {
       setEditedRecord({...record});
       // Store original state in history
-      setHistory([{...record, timestamp: new Date().toISOString(), action: 'opened'}]);
+      setHistory([{...record, timestamp: new Date().toISOString(), action: 'ouvert'}]);
     }
   }, [record]);
 
@@ -44,7 +45,7 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
       setHistory(prev => [...prev, {
         ...editedRecord, 
         timestamp: new Date().toISOString(), 
-        action: 'saving'
+        action: 'sauvegarde en cours'
       }]);
 
       const success = await databaseService.updateRecord(tableName, record.id, editedRecord);
@@ -52,23 +53,23 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
       if (success) {
         onSave(editedRecord);
         toast({
-          title: "Record Updated",
-          description: "Changes have been saved successfully to the database.",
+          title: "Enregistrement mis à jour",
+          description: "Les modifications ont été sauvegardées avec succès dans la base de données.",
         });
         setHistory(prev => [...prev, {
           ...editedRecord, 
           timestamp: new Date().toISOString(), 
-          action: 'saved'
+          action: 'sauvegardé'
         }]);
         onClose();
       } else {
-        throw new Error('Failed to update record');
+        throw new Error('Échec de la mise à jour de l\'enregistrement');
       }
     } catch (error) {
       console.error('Failed to save record:', error);
       toast({
-        title: "Error",
-        description: "Failed to save changes to database. Changes reverted.",
+        title: "Erreur",
+        description: "Échec de la sauvegarde des modifications dans la base de données. Modifications annulées.",
         variant: "destructive",
       });
       // Fallback: revert to original state
@@ -89,18 +90,35 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
   };
 
   const getFieldType = (key: string, value: any) => {
-    if (key.includes('date') || key.includes('_at')) return 'date';
+    if (key.includes('date') || key.includes('_at') || key === 'date_de_revue') return 'date';
     if (typeof value === 'number') return 'number';
-    if (key.includes('description') || key.includes('notes')) return 'textarea';
+    if (key.includes('description') || key.includes('notes') || key === 'identity') return 'textarea';
     return 'text';
+  };
+
+  const getFieldLabel = (key: string) => {
+    const labels: Record<string, string> = {
+      hostname: 'Nom d\'hôte',
+      site_name: 'Nom du site',
+      app_name: 'Nom de l\'application',
+      responsable: 'Responsable',
+      date_de_revue: 'Date de revue',
+      version_socle: 'Version socle',
+      pool_name: 'Nom du pool',
+      pool_state: 'État du pool',
+      runtime: 'Runtime',
+      identity: 'Identité',
+      collected_at: 'Collecté le',
+    };
+    return labels[key] || key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1);
   };
 
   const revertToVersion = (versionIndex: number) => {
     if (history[versionIndex]) {
       setEditedRecord({...history[versionIndex]});
       toast({
-        title: "Reverted",
-        description: `Reverted to version from ${new Date(history[versionIndex].timestamp).toLocaleString()}`,
+        title: "Version restaurée",
+        description: `Restauré à la version du ${new Date(history[versionIndex].timestamp).toLocaleString()}`,
       });
     }
   };
@@ -109,44 +127,55 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Edit Record - {tableName}</DialogTitle>
-          <DialogDescription>
-            Make changes to the record fields below. All changes will be saved to the database.
+          <DialogTitle className="text-xl">Modifier l'enregistrement - Yggdrasil Listing</DialogTitle>
+          <DialogDescription className="flex items-center gap-2">
+            Modifiez les champs de l'enregistrement ci-dessous. Toutes les modifications seront sauvegardées dans la base de données.
+            <Badge variant="outline">{tableName}</Badge>
           </DialogDescription>
         </DialogHeader>
         
         <div className="flex gap-6 flex-1 overflow-hidden">
           {/* Main editing area */}
-          <div className="flex-1 space-y-4 overflow-y-auto pr-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex-1 space-y-6 overflow-y-auto pr-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {Object.entries(record).map(([key, value]) => {
-                if (key === 'id') return null;
+                if (key === 'id' || key === '_tableName') return null;
                 
                 const fieldType = getFieldType(key, value);
                 
                 return (
-                  <div key={key} className="space-y-2">
-                    <Label htmlFor={key} className="text-sm font-medium capitalize">
-                      {key.replace(/_/g, ' ')}
+                  <div key={key} className="space-y-3">
+                    <Label htmlFor={key} className="text-sm font-semibold text-foreground">
+                      {getFieldLabel(key)}
                     </Label>
                     {fieldType === 'textarea' ? (
                       <Textarea
                         id={key}
                         value={editedRecord[key] || ''}
                         onChange={(e) => handleFieldChange(key, e.target.value)}
-                        className="text-sm min-h-[80px]"
-                        placeholder={`Enter ${key.replace(/_/g, ' ')}...`}
+                        className="min-h-[120px] resize-none"
+                        placeholder={`Entrez ${getFieldLabel(key).toLowerCase()}...`}
                       />
+                    ) : key === 'pool_state' ? (
+                      <select
+                        id={key}
+                        value={editedRecord[key] || ''}
+                        onChange={(e) => handleFieldChange(key, e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="Started">Started</option>
+                        <option value="Stopped">Stopped</option>
+                      </select>
                     ) : (
                       <Input
                         id={key}
                         type={fieldType}
                         value={editedRecord[key] || ''}
                         onChange={(e) => handleFieldChange(key, e.target.value)}
-                        className="text-sm"
-                        placeholder={`Enter ${key.replace(/_/g, ' ')}...`}
+                        className="h-10"
+                        placeholder={`Entrez ${getFieldLabel(key).toLowerCase()}...`}
                       />
                     )}
                   </div>
@@ -156,23 +185,23 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
           </div>
 
           {/* History sidebar */}
-          <div className="w-80 border-l pl-4 overflow-y-auto">
-            <h4 className="font-medium mb-3">Edit History</h4>
-            <div className="space-y-2 text-xs">
+          <div className="w-80 border-l pl-6 overflow-y-auto bg-muted/30 rounded-lg p-4">
+            <h4 className="font-semibold mb-4 text-foreground">Historique des modifications</h4>
+            <div className="space-y-3">
               {history.map((version, index) => (
-                <div key={index} className="p-2 bg-muted rounded text-xs">
-                  <div className="font-medium">{version.action}</div>
-                  <div className="text-muted-foreground">
-                    {new Date(version.timestamp).toLocaleString()}
+                <div key={index} className="p-3 bg-background rounded-md border text-sm">
+                  <div className="font-medium text-foreground capitalize">{version.action}</div>
+                  <div className="text-muted-foreground text-xs mt-1">
+                    {new Date(version.timestamp).toLocaleString('fr-FR')}
                   </div>
                   {index > 0 && (
                     <Button
                       variant="link" 
                       size="sm"
-                      className="h-auto p-0 text-xs"
+                      className="h-auto p-0 text-xs mt-2 text-blue-600"
                       onClick={() => revertToVersion(index)}
                     >
-                      Revert to this version
+                      Restaurer cette version
                     </Button>
                   )}
                 </div>
@@ -181,12 +210,12 @@ export const EditRecordDialog = ({ isOpen, onClose, record, tableName, onSave }:
           </div>
         </div>
         
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-6 pt-4 border-t">
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
-            Cancel
+            Annuler
           </Button>
-          <Button onClick={handleSave} disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Changes"}
+          <Button onClick={handleSave} disabled={isLoading} className="min-w-[120px]">
+            {isLoading ? "Sauvegarde..." : "Sauvegarder"}
           </Button>
         </DialogFooter>
       </DialogContent>

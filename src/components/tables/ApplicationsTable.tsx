@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from "react";
 import { DataTable } from "./DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ export interface Application {
   site_name: string;
   app_name: string;
   responsable: string;
-  date_revue: string;
+  date_de_revue: string; // Correction du nom de colonne
   version_socle: string;
   pool_name: string;
   pool_state: "Started" | "Stopped";
@@ -55,8 +56,8 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
             hostname: row.hostname || '',
             site_name: row.site_name || '',
             app_name: row.app_name || '',
-            responsable: row.responsable || '', // Default empty, to be filled manually
-            date_revue: row.date_revue || '', // Default empty, to be filled manually
+            responsable: row.responsable || '', // Correction du nom de colonne
+            date_de_revue: row.date_de_revue || '', // Correction du nom de colonne
             version_socle: row.version_socle || '',
             pool_name: row.pool_name || '',
             pool_state: row.pool_state === "Started" ? "Started" : "Stopped",
@@ -74,8 +75,8 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
       setData(iisTableData);
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to load IIS application data.",
+        title: "Erreur",
+        description: "Échec du chargement des données d'applications IIS.",
         variant: "destructive",
       });
     } finally {
@@ -96,37 +97,67 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     ));
     
     toast({
-      title: "Record Updated",
-      description: "Application data updated successfully in database.",
+      title: "Enregistrement mis à jour",
+      description: "Les données de l'application ont été mises à jour avec succès dans la base de données.",
     });
     
     // Refresh data to ensure consistency
     await loadIISData();
   };
 
-  const handleAddRecord = () => {
-    const newRecord: Application = {
-      id: (data.length + 1).toString(),
+  const handleAddRecord = async () => {
+    // Get the first IIS table to add the record to
+    const iisTables = availableTables.filter(table => table.type === 'iis');
+    if (iisTables.length === 0) {
+      toast({
+        title: "Erreur",
+        description: "Aucune table IIS trouvée pour ajouter un enregistrement.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const targetTable = iisTables[0].name;
+    const newRecord: Partial<Application> = {
       hostname: "",
       site_name: "",
       app_name: "",
       responsable: "",
-      date_revue: new Date().toISOString().split('T')[0],
+      date_de_revue: "",
       version_socle: "",
       pool_name: "",
       pool_state: "Stopped",
       runtime: "",
       identity: "",
-      collected_at: new Date().toISOString()
     };
-    setData(prev => [...prev, newRecord]);
-    setEditingRecord(newRecord);
-    toast({
-      title: "Record Added",
-      description: "New blank record created. Fill in the details.",
-    });
+
+    try {
+      const success = await databaseService.createRecord(targetTable, newRecord);
+      if (success) {
+        toast({
+          title: "Enregistrement ajouté",
+          description: "Nouvel enregistrement créé avec succès. Veuillez remplir les détails.",
+        });
+        await loadIISData(); // Refresh to get the new record with its ID
+        
+        // Find and edit the newly created record
+        setTimeout(() => {
+          const newRecords = data.filter(r => !r.hostname && !r.app_name);
+          if (newRecords.length > 0) {
+            handleEditRecord(newRecords[newRecords.length - 1]);
+          }
+        }, 500);
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Échec de la création de l'enregistrement.",
+        variant: "destructive",
+      });
+    }
   };
 
+  // Update the onAddRecord prop function
   if (onAddRecord) {
     onAddRecord = handleAddRecord;
   }
@@ -134,14 +165,14 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
   const columns = useMemo(() => [
     {
       accessorKey: "hostname",
-      header: "Hostname",
+      header: "Nom d'hôte",
       cell: ({ row }: any) => (
         <span className="font-mono text-sm">{row.original.hostname}</span>
       ),
     },
     {
       accessorKey: "site_name",
-      header: "Site Name",
+      header: "Nom du site",
     },
     {
       accessorKey: "app_name",
@@ -152,19 +183,19 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     },
     {
       accessorKey: "responsable",
-      header: "Responsible",
+      header: "Responsable",
       cell: ({ row }: any) => (
         <span className={`${row.original.responsable ? 'text-blue-600' : 'text-muted-foreground italic'}`}>
-          {row.original.responsable || 'Not assigned'}
+          {row.original.responsable || 'Non assigné'}
         </span>
       ),
     },
     {
-      accessorKey: "date_revue",
-      header: "Review Date",
+      accessorKey: "date_de_revue", // Correction du nom de colonne
+      header: "Date de revue",
       cell: ({ row }: any) => (
-        <span className={`text-sm ${row.original.date_revue ? '' : 'text-muted-foreground italic'}`}>
-          {row.original.date_revue || 'Not scheduled'}
+        <span className={`text-sm ${row.original.date_de_revue ? '' : 'text-muted-foreground italic'}`}>
+          {row.original.date_de_revue || 'Non planifiée'}
         </span>
       ),
     },
@@ -177,7 +208,7 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     },
     {
       accessorKey: "pool_state",
-      header: "Pool State",
+      header: "État du pool",
       cell: ({ row }: any) => (
         <Badge 
           variant={row.original.pool_state === "Started" ? "default" : "destructive"}
@@ -197,7 +228,7 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     },
     {
       accessorKey: "collected_at",
-      header: "Last Collected",
+      header: "Dernière collecte",
       cell: ({ row }: any) => (
         <span className="text-xs text-muted-foreground">
           {formatDistanceToNow(new Date(row.original.collected_at), { addSuffix: true })}
@@ -219,8 +250,8 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     return (
       <div className="space-y-4">
         <div className="text-center py-8">
-          <h1 className="text-2xl font-bold tracking-tight">Loading IIS Applications...</h1>
-          <p className="text-muted-foreground">Fetching data from {availableTables.filter(t => t.type === 'iis').length} IIS tables</p>
+          <h1 className="text-2xl font-bold tracking-tight">Chargement des applications IIS...</h1>
+          <p className="text-muted-foreground">Récupération des données depuis {availableTables.filter(t => t.type === 'iis').length} tables IIS</p>
         </div>
       </div>
     );
@@ -230,19 +261,19 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">IIS Applications</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Applications IIS - Yggdrasil Listing</h1>
           <p className="text-muted-foreground">
-            Manage and monitor your IIS application pools and sites • {availableTables.filter(t => t.type === 'iis').length} tables • {data.length} total records
+            Gérez et surveillez vos pools d'applications et sites IIS • {availableTables.filter(t => t.type === 'iis').length} tables • {data.length} enregistrements au total
           </p>
         </div>
         <div className="flex gap-2">
           <Badge variant="outline" className="gap-1">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            {data.filter(app => app.pool_state === "Started").length} Active
+            {data.filter(app => app.pool_state === "Started").length} Actives
           </Badge>
           <Badge variant="outline" className="gap-1">
             <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-            {data.filter(app => app.pool_state === "Stopped").length} Stopped
+            {data.filter(app => app.pool_state === "Stopped").length} Arrêtées
           </Badge>
         </div>
       </div>
@@ -252,6 +283,7 @@ export const ApplicationsTable = ({ searchQuery, onAddRecord, availableTables, o
         columns={columns}
         onUpdateData={setData}
         onEditRecord={handleEditRecord}
+        onAddRecord={handleAddRecord}
       />
 
       <EditRecordDialog

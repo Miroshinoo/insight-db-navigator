@@ -1,4 +1,3 @@
-
 import { PostgreSQLConfig } from "@/components/DatabaseSettings";
 import { mockDatabaseAPI } from "@/api/database";
 
@@ -164,6 +163,27 @@ class DatabaseService {
       return result.success;
     } catch (error) {
       console.error('Failed to update record:', error);
+      return false;
+    }
+  }
+
+  async createRecord(tableName: string, data: Record<string, any>): Promise<boolean> {
+    if (!this.config) {
+      throw new Error('Base de données non configurée');
+    }
+
+    if (!this.isConnected) {
+      const connected = await this.connect();
+      if (!connected) {
+        throw new Error('Échec de la connexion à la base de données');
+      }
+    }
+
+    try {
+      const result = await mockDatabaseAPI.createRecord(this.config, tableName, data);
+      return result.success;
+    } catch (error) {
+      console.error('Failed to create record:', error);
       return false;
     }
   }

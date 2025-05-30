@@ -27,16 +27,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, ArrowUpDown, Edit } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowUpDown, Edit, Plus } from "lucide-react";
 
 interface DataTableProps {
   data: any[];
   columns: any[];
   onUpdateData: (data: any[]) => void;
   onEditRecord?: (record: any) => void;
+  onAddRecord?: () => void;
 }
 
-export const DataTable = ({ data, columns, onUpdateData, onEditRecord }: DataTableProps) => {
+export const DataTable = ({ data, columns, onUpdateData, onEditRecord, onAddRecord }: DataTableProps) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
@@ -81,26 +82,37 @@ export const DataTable = ({ data, columns, onUpdateData, onEditRecord }: DataTab
 
   return (
     <div className="space-y-4">
-      {/* Column filters */}
-      <div className="flex flex-wrap gap-2">
-        {table.getAllColumns().map((column) => {
-          if (!column.getCanFilter() || column.id === 'actions') return null;
-          return (
-            <div key={column.id} className="flex flex-col space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                {column.id}
-              </label>
-              <Input
-                placeholder={`Filter ${column.id}...`}
-                value={(column.getFilterValue() as string) ?? ""}
-                onChange={(event) =>
-                  column.setFilterValue(event.target.value || undefined)
-                }
-                className="h-8 w-40"
-              />
-            </div>
-          );
-        })}
+      {/* Header with filters and add button */}
+      <div className="flex justify-between items-start gap-4">
+        {/* Column filters */}
+        <div className="flex flex-wrap gap-2 flex-1">
+          {table.getAllColumns().map((column) => {
+            if (!column.getCanFilter() || column.id === 'actions') return null;
+            return (
+              <div key={column.id} className="flex flex-col space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {column.id}
+                </label>
+                <Input
+                  placeholder={`Filtrer ${column.id}...`}
+                  value={(column.getFilterValue() as string) ?? ""}
+                  onChange={(event) =>
+                    column.setFilterValue(event.target.value || undefined)
+                  }
+                  className="h-8 w-40"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add record button */}
+        {onAddRecord && (
+          <Button onClick={onAddRecord} className="shrink-0">
+            <Plus className="h-4 w-4 mr-2" />
+            Ajouter un enregistrement
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -151,7 +163,7 @@ export const DataTable = ({ data, columns, onUpdateData, onEditRecord }: DataTab
             ) : (
               <TableRow>
                 <TableCell colSpan={enhancedColumns.length} className="h-24 text-center">
-                  No results found.
+                  Aucun résultat trouvé.
                 </TableCell>
               </TableRow>
             )}
@@ -162,7 +174,7 @@ export const DataTable = ({ data, columns, onUpdateData, onEditRecord }: DataTab
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">Rows per page</p>
+          <p className="text-sm font-medium">Lignes par page</p>
           <Select
             value={`${table.getState().pagination.pageSize}`}
             onValueChange={(value) => {
@@ -184,7 +196,7 @@ export const DataTable = ({ data, columns, onUpdateData, onEditRecord }: DataTab
         
         <div className="flex items-center space-x-6 lg:space-x-8">
           <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            Page {table.getState().pagination.pageIndex + 1} sur{" "}
             {table.getPageCount()}
           </div>
           <div className="flex items-center space-x-2">

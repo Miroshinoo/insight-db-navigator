@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
@@ -134,6 +133,33 @@ app.get('/api/tables/:tableName/data', async (req, res) => {
   } catch (error) {
     console.error(`Failed to fetch data from table ${tableName}:`, error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Create record
+app.post('/api/tables/:tableName/records', async (req, res) => {
+  if (!pool) {
+    return res.status(400).json({ error: 'No database connection' });
+  }
+
+  const { tableName } = req.params;
+  const createData = req.body;
+  
+  try {
+    // Build INSERT query dynamically
+    const fields = Object.keys(createData);
+    const placeholders = fields.map((_, index) => `$${index + 1}`).join(', ');
+    const fieldNames = fields.map(field => `"${field}"`).join(', ');
+    const values = fields.map(field => createData[field]);
+    
+    const query = `INSERT INTO "${tableName}" (${fieldNames}) VALUES (${placeholders}) RETURNING id`;
+    
+    const result = await pool.query(query, values);
+    
+    res.json({ success: true, id: result.rows[0]?.id });
+  } catch (error) {
+    console.error(`Failed to create record in table ${tableName}:`, error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

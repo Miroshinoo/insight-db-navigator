@@ -20,6 +20,7 @@ export interface DatabaseAPI {
   getTables: (config: any) => Promise<string[]>;
   getTableData: (config: any, tableName: string) => Promise<{ columns: string[]; rows: any[] }>;
   updateRecord: (config: any, tableName: string, recordId: string, data: any) => Promise<{ success: boolean }>;
+  createRecord: (config: any, tableName: string, data: any) => Promise<{ success: boolean }>;
 }
 
 // Real implementation that connects to the backend API
@@ -163,6 +164,28 @@ export const mockDatabaseAPI: DatabaseAPI = {
       return result;
     } catch (error) {
       console.error(`Failed to update record in table ${tableName}:`, error);
+      return { success: false };
+    }
+  },
+  
+  createRecord: async (config, tableName, data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${encodeURIComponent(tableName)}/records`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error(`Failed to create record in table ${tableName}:`, error);
       return { success: false };
     }
   }
