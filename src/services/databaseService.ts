@@ -1,3 +1,4 @@
+
 import { PostgreSQLConfig } from "@/components/DatabaseSettings";
 import { mockDatabaseAPI } from "@/api/database";
 
@@ -16,10 +17,12 @@ export interface TableData {
 class DatabaseService {
   private config: PostgreSQLConfig | null = null;
   private isConnected = false;
+  private tableColumnsCache = new Map<string, string[]>();
 
   setConfig(config: PostgreSQLConfig) {
     this.config = config;
     this.isConnected = false;
+    this.tableColumnsCache.clear();
     console.log('Database config set:', config);
   }
 
@@ -83,12 +86,37 @@ class DatabaseService {
     try {
       const tables = await mockDatabaseAPI.getTables(this.config);
       
-      return tables.map((tableName: string): TableInfo => ({
-        name: tableName,
-        type: this.categorizeTable(tableName),
-        rowCount: 0,
-        lastUpdated: new Date().toISOString()
-      }));
+      const tableInfos: TableInfo[] = [];
+      
+      for (const tableName of tables) {
+        try {
+          // Get table columns to help with categorization
+          const tableData = await mockDatabaseAPI.getTableData(this.config, tableName);
+          this.tableColumnsCache.set(tableName, tableData.columns);
+          
+          const tableInfo: TableInfo = {
+            name: tableName,
+            type: this.categorizeTable(tableName, tableData.columns),
+            rowCount: tableData.rows.length,
+            lastUpdated: new Date().toISOString()
+          };
+          
+          tableInfos.push(tableInfo);
+        } catch (error) {
+          console.warn(`Failed to get data for table ${tableName}, using name-based categorization:`, error);
+          // Fallback to name-based categorization if we can't get columns
+          const tableInfo: TableInfo = {
+            name: tableName,
+            type: this.categorizeTable(tableName, []),
+            rowCount: 0,
+            lastUpdated: new Date().toISOString()
+          };
+          
+          tableInfos.push(tableInfo);
+        }
+      }
+      
+      return tableInfos;
     } catch (error) {
       console.error('Failed to fetch tables:', error);
       throw error;
@@ -140,19 +168,65 @@ class DatabaseService {
     }
   }
 
-  private categorizeTable(tableName: string): 'iis' | 'sql' {
-    // Match patterns like vp-v9-, vp-v10-, vp-v11-, etc. (including double digits)
-    if (tableName.match(/^vp-v\d+-.*/)) {
+  private categorizeTable(tableName: string, columns: string[]): 'iis' | 'sql' {
+    // IIS-specific column patterns
+    const iisColumns = [
+      'site_name', 'application_pool', 'binding', 'port', 'protocol', 'path', 'app_pool',
+      'site_id', 'physical_path', 'virtual_directory', 'default_document', 'authentication',
+      'ssl_certificate', 'hostname', 'state', 'last_connection', 'version'
+    ];
+    
+    // SQL-specific column patterns
+    const sqlColumns = [
+      'database_name', 'db_name', 'schema_name', 'table_count', 'size_mb', 'owner',
+      'collation', 'compatibility_level', 'recovery_model', 'log_size_mb'
+    ];
+
+    // Check column names for categorization hints
+    const lowerColumns = columns.map(col => col.toLowerCase());
+    
+    const iisScore = iisColumns.filter(iisCol => 
+      lowerColumns.some(col => col.includes(iisCol) || iisCol.includes(col))
+    ).length;
+    
+    const sqlScore = sqlColumns.filter(sqlCol => 
+      lowerColumns.some(col => col.includes(sqlCol) || sqlCol.includes(col))
+    ).length;
+
+    // If we have clear column indicators, use them
+    if (iisScore > sqlScore && iisScore > 0) {
       return 'iis';
-    } else if (tableName.startsWith('vp-sql-')) {
+    } else if (sqlScore > iisScore && sqlScore > 0) {
       return 'sql';
     }
-    // Default categorization based on common patterns
-    if (tableName.toLowerCase().includes('iis') || 
-        tableName.toLowerCase().includes('application') ||
-        tableName.toLowerCase().includes('site')) {
+
+    // Fallback to name-based categorization with improved patterns
+    const lowerTableName = tableName.toLowerCase();
+    
+    // IIS patterns - more comprehensive
+    if (lowerTableName.match(/^vp-v\d+/) || // VP-V10-DEV, VP-V11-PROD, etc.
+        lowerTableName.includes('iis') ||
+        lowerTableName.includes('site') ||
+        lowerTableName.includes('app') ||
+        lowerTableName.includes('web') ||
+        lowerTableName.includes('application')) {
       return 'iis';
     }
+    
+    // SQL patterns
+    if (lowerTableName.startsWith('vp-sql') ||
+        lowerTableName.includes('database') ||
+        lowerTableName.includes('sql') ||
+        lowerTableName.includes('db')) {
+      return 'sql';
+    }
+
+    // Default: if it starts with VP- but doesn't match SQL pattern, assume IIS
+    if (lowerTableName.startsWith('vp-')) {
+      return 'iis';
+    }
+    
+    // Final fallback
     return 'sql';
   }
 }
